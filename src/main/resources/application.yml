@@ -6,6 +6,3 @@ code_sandbox:
   global_code_dir_name: tmpCode
   global_java_class_name: Main.java
 
-#spring:
-#  datasource:
-#    password: 123456
