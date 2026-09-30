@@ -1,0 +1,11 @@
+server:
+  port: 8090
+
+code_sandbox:
+  time_out: 10000
+  global_code_dir_name: tmpCode
+  global_java_class_name: Main.java
+
+#spring:
+#  datasource:
+#    password: 123456
