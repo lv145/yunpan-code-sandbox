@@ -134,7 +134,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                             errorMessage[0] = payload;
                             System.out.println("输出错误结果：" + errorMessage[0]);
                         } else {
-                            message[0] = payload;
+                            message[0] = payload.replaceAll("[\\r\\n]+$", "");;
                             System.out.println("输出结果：" + message[0]);
                         }
                         super.onNext(frame);
