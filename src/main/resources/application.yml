@@ -7,6 +7,3 @@ code_sandbox:
   global_java_class_name: Main.java
   jvm_error_lang: en #zh en
 
-#spring:
-#  datasource:
-#    password: 123456
