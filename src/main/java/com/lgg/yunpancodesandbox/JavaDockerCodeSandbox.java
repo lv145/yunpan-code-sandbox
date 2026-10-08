@@ -114,7 +114,6 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                         .withAttachStdin(true)
                         .withAttachStdout(true)
                         .exec();
-                System.out.println("创建执行命令：" + execCreateCmdResponse);
 
                 ExecuteMessage executeMessage = new ExecuteMessage();
                 final String[] message = {null};

@@ -28,7 +28,7 @@ public class ProcessUtils {
 
         // ========== 异步消费 stdout 和 stderr，防止缓冲区满阻塞进程 ==========
         StringBuilder stdOutSb = new StringBuilder();
-//        StringBuilder stdErrSb = new StringBuilder();
+        StringBuilder stdErrSb = new StringBuilder();
 
         // 读取标准输出线程
         Thread stdOutThread = new Thread(() -> {
@@ -43,18 +43,18 @@ public class ProcessUtils {
         });
 
 //        // 读取错误输出线程
-//        Thread stdErrThread = new Thread(() -> {
-//            try (BufferedReader br = new BufferedReader(new InputStreamReader(runProcess.getErrorStream()))) {
-//                String line;
-//                while ((line = br.readLine()) != null) {
-//                    stdErrSb.append(line).append("\n");
-//                }
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        });
+        Thread stdErrThread = new Thread(() -> {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(runProcess.getErrorStream()))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    stdErrSb.append(line).append("\n");
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
         stdOutThread.start();
-//        stdErrThread.start();
+        stdErrThread.start();
 
         try {
             // 等待程序执行，获取错误码
@@ -63,17 +63,17 @@ public class ProcessUtils {
 
             // 等待两个流读取线程跑完
             stdOutThread.join();
-//            stdErrThread.join();
+            stdErrThread.join();
 
             String stdOut = stdOutSb.toString();
-//            String stdErr = stdErrSb.toString();
+            String stdErr = stdErrSb.toString();
 
             executeMessage.setMessage(stdOut);
             if (exitValue == 0) {
                 System.out.println(opName + "成功");
             } else {
                 System.out.println(opName + "失败，错误码： " + exitValue);
-//                executeMessage.setErrorMessage(stdErr);
+                executeMessage.setErrorMessage(stdErr);
             }
             stopWatch.stop();
             executeMessage.setTime(stopWatch.getLastTaskTimeMillis());

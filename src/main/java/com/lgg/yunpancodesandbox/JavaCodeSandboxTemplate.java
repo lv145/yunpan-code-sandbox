@@ -7,10 +7,13 @@ import com.lgg.yunpancodesandbox.model.ExecuteCodeRequest;
 import com.lgg.yunpancodesandbox.model.ExecuteCodeResponse;
 import com.lgg.yunpancodesandbox.model.ExecuteMessage;
 import com.lgg.yunpancodesandbox.model.JudgeInfo;
+import com.lgg.yunpancodesandbox.utils.CodeErrorMsgUtil;
+import com.lgg.yunpancodesandbox.utils.CompileMsgFilterUtil;
 import com.lgg.yunpancodesandbox.utils.ProcessUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 
+import javax.annotation.Resource;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -31,6 +34,9 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
     @Value("${code_sandbox.time_out}")
     public  long TIME_OUT;
 
+    @Resource
+    CodeErrorMsgUtil codeErrorMsgUtil;
+
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest executeCodeRequest) {
         List<String> inputList = executeCodeRequest.getInputList();
@@ -46,10 +52,9 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
             deleteFile(userCodeFile);
             return ExecuteCodeResponse.builder()
                     .status(SandBoxResponseStatus.COMPILE_FAILED.getCode())
-                    .message(SandBoxResponseStatus.COMPILE_FAILED.getMessage())
+                    .message(codeErrorMsgUtil.filterCompileMessage(compileFileExecuteMessage.getErrorMessage()))
                     .build();
         }
-        System.out.println(compileFileExecuteMessage);
 
         // 3. 执行代码，得到输出结果
         List<ExecuteMessage> executeMessageList = runFile(userCodeFile, inputList);
@@ -202,7 +207,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
             executeCodeResponse.setStatus(SandBoxResponseStatus.SUCCESS.getCode());
             executeCodeResponse.setMessage(SandBoxResponseStatus.SUCCESS.getMessage());
         }else{
-            judgeInfo.setMessage(executeCodeResponse.getMessage());
+            judgeInfo.setMessage(codeErrorMsgUtil.parseUserCodeError(executeCodeResponse.getMessage()));
             executeCodeResponse.setMessage(SandBoxResponseStatus.RUN_FAILED.getMessage());
         }
 

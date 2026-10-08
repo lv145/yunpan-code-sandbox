@@ -5,6 +5,7 @@ code_sandbox:
   time_out: 10000
   global_code_dir_name: tmpCode
   global_java_class_name: Main.java
+  jvm_error_lang: en #zh en
 
 #spring:
 #  datasource:
