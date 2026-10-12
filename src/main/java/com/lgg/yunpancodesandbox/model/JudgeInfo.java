@@ -12,9 +12,9 @@ import lombok.NoArgsConstructor;
 public class JudgeInfo {
 
     /**
-     * 程序执行信息
+     * 程序错误信息
      */
-    private String message;
+    private String errorMessage;
 
     /**
      * 消耗内存

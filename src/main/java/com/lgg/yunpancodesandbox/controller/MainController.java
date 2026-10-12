@@ -1,8 +1,13 @@
 package com.lgg.yunpancodesandbox.controller;
 
-import com.lgg.yunpancodesandbox.JavaNativeCodeSandbox;
+import com.lgg.yunpancodesandbox.common.BaseResponse;
+import com.lgg.yunpancodesandbox.common.ErrorCode;
+import com.lgg.yunpancodesandbox.common.ResultUtils;
+import com.lgg.yunpancodesandbox.template.JavaNativeCodeSandbox;
 import com.lgg.yunpancodesandbox.model.ExecuteCodeRequest;
 import com.lgg.yunpancodesandbox.model.ExecuteCodeResponse;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,15 +17,14 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 @RestController("/")
 public class MainController {
 
     // 定义鉴权请求头和密钥
-    private static final String AUTH_REQUEST_HEADER = "auth";
+    private static final String AUTH_REQUEST_HEADER = "X-Auth-Secret";
 
-    private static final String AUTH_REQUEST_SECRET = "secretKey";
+    private static final String AUTH_REQUEST_SECRET = "lgg";
 
     @Resource
     private JavaNativeCodeSandbox javaNativeCodeSandbox;
@@ -37,19 +41,20 @@ public class MainController {
      * @return
      */
     @PostMapping("/executeCode")
-    ExecuteCodeResponse executeCode(@RequestBody ExecuteCodeRequest executeCodeRequest, HttpServletRequest request,
-                                    HttpServletResponse response) throws IOException {
+    BaseResponse executeCode(@RequestBody ExecuteCodeRequest executeCodeRequest, HttpServletRequest request){
         // 基本的认证
         String authHeader = request.getHeader(AUTH_REQUEST_HEADER);
         if (!AUTH_REQUEST_SECRET.equals(authHeader)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return ExecuteCodeResponse.builder().message("鉴权失败!").build();
+            return ResultUtils.error(ErrorCode.NO_AUTH_ERROR,ErrorCode.NO_AUTH_ERROR.getMessage());
         }
-        if (executeCodeRequest == null||executeCodeRequest.getCode().isEmpty()
-                ||executeCodeRequest.getInputList().isEmpty()||executeCodeRequest.getLanguage().isEmpty()) {
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            return ExecuteCodeResponse.builder().message("参数不能为空!").build();
+        ExecuteCodeRequest req = executeCodeRequest;
+        if (req == null
+                || StringUtils.isBlank(req.getCode())
+                || CollectionUtils.isEmpty(req.getInputList())
+                || StringUtils.isBlank(req.getLanguage())) {
+            return ResultUtils.error(ErrorCode.PARAMS_ERROR,ErrorCode.PARAMS_ERROR.getMessage());
         }
-        return javaNativeCodeSandbox.executeCode(executeCodeRequest);
+        ExecuteCodeResponse executeCodeResponse = javaNativeCodeSandbox.executeCode(executeCodeRequest);
+        return ResultUtils.success(executeCodeResponse);
     }
 }

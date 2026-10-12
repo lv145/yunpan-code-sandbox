@@ -7,6 +7,8 @@ import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.github.dockerjava.transport.DockerHttpClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.core.DockerClientBuilder;
 
 import java.time.Duration;
 
@@ -17,6 +19,7 @@ public class DockerClientConfig {
     public DockerClient dockerClient() {
         // 1. 读取docker连接配置（默认读取系统环境变量，本地docker默认unix socket）
         DefaultDockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
+                .withDockerHost("unix:///var/run/docker.sock")
                 .build();
 
         // 2. 实例化 HttpClient5 传输客户端（重点！消除警告的核心）
