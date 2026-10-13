@@ -11,7 +11,7 @@ import com.lgg.yunpancodesandbox.enums.SandboxExceptionMsgEnum;
 import com.lgg.yunpancodesandbox.model.ExecuteCodeRequest;
 import com.lgg.yunpancodesandbox.model.ExecuteCodeResponse;
 import com.lgg.yunpancodesandbox.model.ExecuteMessage;
-import com.lgg.yunpancodesandbox.model.JudgeInfo;
+import com.lgg.yunpancodesandbox.model.JudgeMessage;
 import com.lgg.yunpancodesandbox.utils.CodeErrorMsgUtil;
 import com.lgg.yunpancodesandbox.utils.ProcessUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -166,19 +166,19 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
     public ExecuteCodeResponse getOutputResponse(List<ExecuteMessage> executeMessageList) {
         ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
         List<String> outputList = new ArrayList<>();
-        List<JudgeInfo> judgeInfoList = new ArrayList<>();
+        List<JudgeMessage> judgeMessagesList = new ArrayList<>();
         // 取用时最大值，便于判断是否超时
         long maxTime = 0;
         long maxMemory = 0L;
 
         for (ExecuteMessage executeMessage : executeMessageList) {
-            JudgeInfo judgeInfo =JudgeInfo.builder().build();
+            JudgeMessage judgeInfo =JudgeMessage.builder().build();
             String errorMessage = executeMessage.getErrorMessage();
             if (StrUtil.isNotBlank(errorMessage)) {
-                judgeInfo.setErrorMessage(CodeErrorMsgUtil.getRawErrorFirstLine(errorMessage));
+                judgeInfo.setErrorMessage(codeErrorMsgUtil.parseUserCodeError(errorMessage));
                 // 用户提交的代码执行中存在错误
                 executeCodeResponse.setStatus(SandBoxResponseStatus.RUN_FAILED.getCode());
-                judgeInfoList.add(judgeInfo);
+                judgeMessagesList.add(judgeInfo);
                 continue;
             }
             Long time = executeMessage.getTime();
@@ -192,7 +192,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
             }
             maxMemory = Math.max(maxMemory, memory);
 
-            judgeInfoList.add(judgeInfo);
+            judgeMessagesList.add(judgeInfo);
         }
         executeCodeResponse.setMaxTime(maxTime);
         executeCodeResponse.setMaxMemory(maxMemory);//kb
@@ -201,7 +201,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
             executeCodeResponse.setStatus(SandBoxResponseStatus.SUCCESS.getCode());
         }
         executeCodeResponse.setOutputList(outputList);
-        executeCodeResponse.setJudgeInfoList(judgeInfoList);
+        executeCodeResponse.setJudgeMessageList(judgeMessagesList);
         return executeCodeResponse;
     }
 

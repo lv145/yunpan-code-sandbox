@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @Builder
-public class JudgeInfo {
+public class JudgeMessage {
 
     /**
      * 程序错误信息

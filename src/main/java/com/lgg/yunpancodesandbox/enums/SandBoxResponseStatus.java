@@ -5,6 +5,7 @@ public enum SandBoxResponseStatus {
     RUN_FAILED(1,"运行失败"),
     COMPILE_FAILED(2,"编译失败"),
     RUN_TIME_OUT(3,"运行超时");
+
     private String message;
     private Integer code;
 

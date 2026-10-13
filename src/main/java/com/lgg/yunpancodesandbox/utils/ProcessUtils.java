@@ -1,6 +1,7 @@
 package com.lgg.yunpancodesandbox.utils;
 
 import cn.hutool.core.util.StrUtil;
+import com.lgg.yunpancodesandbox.exception.BusinessException;
 import com.lgg.yunpancodesandbox.model.ExecuteMessage;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.StopWatch;
@@ -38,7 +39,7 @@ public class ProcessUtils {
                         stdOutSb.append(line).append("\n");
                     }
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    throw new RuntimeException();
                 }
             });
 
@@ -50,7 +51,7 @@ public class ProcessUtils {
                         stdErrSb.append(line).append("\n");
                     }
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    throw new RuntimeException();
                 }
             });
             stdOutThread.start();
@@ -62,8 +63,7 @@ public class ProcessUtils {
                 try {
                     return runProcess.waitFor();
                 } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return -1;
+                    throw new RuntimeException();
                 }
             });
             Integer exitValue = processFuture.get(10, TimeUnit.SECONDS);
@@ -80,9 +80,8 @@ public class ProcessUtils {
             return ExecuteMessage.builder().errorMessage(stdErr)
                     .exitValue(exitValue).resultMessage(stdOut).build();
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new RuntimeException();
         }
-        return ExecuteMessage.builder().exitValue(-1).build();
     }
 
 

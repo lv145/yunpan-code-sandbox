@@ -50,7 +50,7 @@ public class CodeErrorMsgUtil {
      * @param stderr 沙箱原始stderr
      * @return 友好提示文本
      */
-    public String parseUserCodeError(String stderr) {
+    public  String parseUserCodeError(String stderr) {
 
         String err = stderr.trim();
         boolean isEn = "en".equals(lang);

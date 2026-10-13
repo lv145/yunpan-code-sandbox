@@ -2,7 +2,9 @@ server:
   port: 8090
 
 code_sandbox:
-  time_out: 15000
+  auth_request_header: X-Auth-Secret
+  auth_request_secret: lgg
+  time_out: 12000
   global_code_dir_name: tmpCode
   global_java_class_name: Main.java
   jvm_error_lang: en #zh en

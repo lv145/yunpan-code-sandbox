@@ -82,7 +82,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                     }
                 });
         // 等待采集，根据你的代码执行时间调整
-        Thread.sleep(1000);
+        Thread.sleep(800);
         return peakMemory.get();
     }
     /**
@@ -132,7 +132,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
             maxMemory = getContainerMaxMemory(dockerClient, containerId);
         }catch (InterruptedException e) {
             stopWatch.stop();
-            throw  new BusinessException(ErrorCode.SYSTEM_ERROR);
+            throw  new BusinessException(ErrorCode.SYSTEM_ERROR,SandboxExceptionMsgEnum.SANDBOX_DOCKER_ERROR.getMessage());
         }
 
         time = stopWatch.getLastTaskTimeMillis();
@@ -173,11 +173,13 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                             .errorMessage(SandBoxResponseStatus.RUN_TIME_OUT.getMessage()).build());
                     break;
                 }
-
                 ExecuteMessage executeMessage = ExecuteMessage.builder().build();
                 // 修剪末尾换行
                 BeanUtils.copyProperties(executeDockerCmdResponse, executeMessage);
                 executeMessageList.add(executeMessage);
+            }catch (Exception e) {
+                log.error("用例执行异常:{}", e.getMessage());
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR,SandboxExceptionMsgEnum.SANDBOX_DOCKER_ERROR.getMessage());
             } finally {
                 closeContainer(containerId, statsCmd);
             }

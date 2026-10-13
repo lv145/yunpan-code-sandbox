@@ -28,5 +28,5 @@ public class ExecuteCodeResponse {
     /**
      * 判题信息
      */
-    private  List<JudgeInfo> judgeInfoList;
+    private  List<JudgeMessage> judgeMessageList;
 }

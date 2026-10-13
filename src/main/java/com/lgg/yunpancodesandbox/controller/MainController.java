@@ -7,6 +7,7 @@ import com.lgg.yunpancodesandbox.template.JavaNativeCodeSandbox;
 import com.lgg.yunpancodesandbox.model.ExecuteCodeRequest;
 import com.lgg.yunpancodesandbox.model.ExecuteCodeResponse;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,9 +23,10 @@ import java.io.IOException;
 public class MainController {
 
     // 定义鉴权请求头和密钥
-    private static final String AUTH_REQUEST_HEADER = "X-Auth-Secret";
-
-    private static final String AUTH_REQUEST_SECRET = "lgg";
+    @Value("${code_sandbox.auth_request_header}")
+    private  String authRequestHeader;
+    @Value("${code_sandbox.auth_request_secret}")
+    private String authRequestSecret;
 
     @Resource
     private JavaNativeCodeSandbox javaNativeCodeSandbox;
@@ -43,8 +45,8 @@ public class MainController {
     @PostMapping("/executeCode")
     BaseResponse executeCode(@RequestBody ExecuteCodeRequest executeCodeRequest, HttpServletRequest request){
         // 基本的认证
-        String authHeader = request.getHeader(AUTH_REQUEST_HEADER);
-        if (!AUTH_REQUEST_SECRET.equals(authHeader)) {
+        String authHeader = request.getHeader(authRequestHeader);
+        if (!authRequestSecret.equals(authHeader)) {
             return ResultUtils.error(ErrorCode.NO_AUTH_ERROR,ErrorCode.NO_AUTH_ERROR.getMessage());
         }
         ExecuteCodeRequest req = executeCodeRequest;
