@@ -177,7 +177,6 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                 String[] inputArgsArray = inputArgs.split(" ");
                 String[] cmdArray = ArrayUtil.append(LanguageEnum.JAVA.getRunCmdTemplate().split(" "), inputArgsArray);
                 ExecuteDockerCmdResponse executeDockerCmdResponse = executeDockerCmd(cmdArray, containerId);
-                log.info("exe:{}",executeDockerCmdResponse);
                 if (executeDockerCmdResponse.getIsOutputLimitExceeded()) {
                     System.out.println("执行用例输出超限，限制长度：" + maxOutputBytes );
                     executeMessageList.add(ExecuteMessage.builder()
