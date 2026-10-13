@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.lgg.yunpancodesandbox.exception.BusinessException;
 import com.lgg.yunpancodesandbox.model.ExecuteMessage;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
 import java.io.*;
@@ -11,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 进程工具类
@@ -23,8 +25,10 @@ public class ProcessUtils {
      * @param runProcess
      * @return
      */
-
-    public static ExecuteMessage runProcessAndGetMessage(Process runProcess) {
+    public static ExecuteMessage runProcessAndGetMessage(Process runProcess,Long outTime) {
+        return runProcessAndGetMessage(runProcess,outTime,TimeUnit.MILLISECONDS);
+    }
+    public static ExecuteMessage runProcessAndGetMessage(Process runProcess,Long outTime,TimeUnit unit) {
         // ========== 异步消费 stdout 和 stderr，防止缓冲区满阻塞进程 ==========
         StringBuilder stdOutSb = new StringBuilder();
         StringBuilder stdErrSb = new StringBuilder();
@@ -39,7 +43,7 @@ public class ProcessUtils {
                         stdOutSb.append(line).append("\n");
                     }
                 } catch (IOException e) {
-                    throw new RuntimeException();
+                    throw new RuntimeException(e.getMessage());
                 }
             });
 
@@ -51,7 +55,7 @@ public class ProcessUtils {
                         stdErrSb.append(line).append("\n");
                     }
                 } catch (IOException e) {
-                    throw new RuntimeException();
+                    throw new RuntimeException(e.getMessage());
                 }
             });
             stdOutThread.start();
@@ -63,10 +67,16 @@ public class ProcessUtils {
                 try {
                     return runProcess.waitFor();
                 } catch (InterruptedException e) {
-                    throw new RuntimeException();
+                    throw new RuntimeException(e.getMessage());
                 }
             });
-            Integer exitValue = processFuture.get(10, TimeUnit.SECONDS);
+            Integer exitValue;
+            try {
+                 exitValue = processFuture.get(outTime, unit);
+            }catch (TimeoutException e){
+                exitValue=null;
+            }
+            System.out.println("运行码： " + exitValue);
             // 等待两个流读取线程跑完
             stdOutThread.join();
             stdErrThread.join();
@@ -74,13 +84,12 @@ public class ProcessUtils {
             String stdOut = stdOutSb.toString();
             String stdErr = stdErrSb.toString();
 
-            if (exitValue != 0) {
-                System.out.println("运行失败，错误码： " + exitValue);
-            }
             return ExecuteMessage.builder().errorMessage(stdErr)
                     .exitValue(exitValue).resultMessage(stdOut).build();
         } catch (Exception e) {
-            throw new RuntimeException();
+            throw new RuntimeException(e.getMessage());
+        }finally {
+            runProcess.destroy();
         }
     }
 

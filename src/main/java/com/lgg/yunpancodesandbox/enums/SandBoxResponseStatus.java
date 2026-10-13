@@ -1,41 +1,36 @@
 package com.lgg.yunpancodesandbox.enums;
 
 public enum SandBoxResponseStatus {
-    SUCCESS(0,"运行成功"),
-    RUN_FAILED(1,"运行失败"),
-    COMPILE_FAILED(2,"编译失败"),
-    RUN_TIME_OUT(3,"运行超时");
+    SUCCESS(0, "运行成功）"),
+    RUN_FAILED(1, "运行失败RE"),
+    COMPILE_FAILED(2, "编译失败CE"),
+    RUN_TIME_OUT(3, "运行超时TLE"),
+    OUTPUT_LIMIT_EXCEEDED(4, "输出超限OLE"),
+    COMPILE_TIMEOUT(5, "编译超时"),
 
-    private String message;
-    private Integer code;
+    SANDBOX_ERROR(99, "沙箱底层异常");
 
-    SandBoxResponseStatus() {
-    }
+    private final Integer code;
+    private final String message;
 
-    SandBoxResponseStatus(String message, Integer code) {
-        this.message = message;
+    SandBoxResponseStatus(Integer code, String message) {
         this.code = code;
-    }
-
-
-    SandBoxResponseStatus(Integer code, String message){
         this.message = message;
-        this.code = code;
     }
 
-    /**
-     * 获取
-     * @return message
-     */
     public String getMessage() {
         return message;
     }
-    /**
-     * 获取
-     * @return code
-     */
+
     public Integer getCode() {
         return code;
     }
-
+    public static Integer getCodeResponseStatus(String message) {
+        for (SandBoxResponseStatus value : SandBoxResponseStatus.values()) {
+            if (value.getMessage().equals(message)) {
+                return value.code;
+            }
+        }
+        return null;
+    }
 }

@@ -5,6 +5,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import com.lgg.yunpancodesandbox.CodeSandbox;
 
+import com.lgg.yunpancodesandbox.enums.CodeExceptionEnum;
 import com.lgg.yunpancodesandbox.enums.LanguageEnum;
 import com.lgg.yunpancodesandbox.enums.SandBoxResponseStatus;
 import com.lgg.yunpancodesandbox.enums.SandboxExceptionMsgEnum;
@@ -21,6 +22,7 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -28,13 +30,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @Slf4j
 public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
+    @Value("${code_sandbox.jvm_error_lang}")
+    public String lang ;
     @Value("${code_sandbox.global_code_dir_name}")
     private  String globalCodeDirName;
     @Value("${code_sandbox.global_java_class_name}")
     private  String globalJavaClassName ;
     @Value("${code_sandbox.time_out}")
-    public  long TIME_OUT;
-
+    public  long timeOut ;
+    @Value("${code_sandbox.max_output_bytes}")
+    public long  maxOutputBytes;
     @Resource
     CodeErrorMsgUtil codeErrorMsgUtil;
 
@@ -47,6 +52,10 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         File userCodeFile = saveCodeToFile(code);
 //        2. 编译代码，得到 class 文件
         ExecuteMessage compileFileExecuteMessage = compileFile(userCodeFile);
+        if (compileFileExecuteMessage.getExitValue()==null){
+            return ExecuteCodeResponse.builder().status(SandBoxResponseStatus.COMPILE_TIMEOUT.getCode())
+                    .compileErrorMessage(SandBoxResponseStatus.COMPILE_TIMEOUT.getMessage()).build();
+        }
         if (compileFileExecuteMessage.getExitValue()!=0){
             deleteFile(userCodeFile);
             String errorMessage= codeErrorMsgUtil
@@ -99,10 +108,9 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         String compileCmd = String.format(LanguageEnum.JAVA.getCompileCmdTemplate(), userCodeFile.getAbsolutePath());
         try {
             Process compileProcess = Runtime.getRuntime().exec(compileCmd);
-            ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(compileProcess);
-            return executeMessage;
+            return ProcessUtils.runProcessAndGetMessage(compileProcess,timeOut);
         } catch (Exception e) {
-            throw new RuntimeException(SandboxExceptionMsgEnum.COMPILE_ERROR.getMessage());
+            throw new RuntimeException(SandboxExceptionMsgEnum.COMPILE_ERROR.getMessage()+":"+e.getMessage());
         }
     }
     /**
@@ -123,7 +131,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
 
                 Thread timeoutThread = getTimeOutThread(taskDone, runProcess);
 
-                ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(runProcess);
+                ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(runProcess,timeOut);
                 System.out.println(executeMessage);
                 executeMessageList.add(executeMessage);
                 taskDone.set(true);
@@ -139,7 +147,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
     private Thread getTimeOutThread(AtomicBoolean taskDone, Process runProcess) {
         Thread timeoutThread = new Thread(() -> {
             try {
-                Thread.sleep(TIME_OUT);
+                Thread.sleep(timeOut);
                 if (!taskDone.get() && runProcess.isAlive()) {
                     System.out.println("超时了，中断");
                     runProcess.destroy();
@@ -171,13 +179,17 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         long maxTime = 0;
         long maxMemory = 0L;
 
+        executeCodeResponse.setStatus(SandBoxResponseStatus.SUCCESS.getCode());
         for (ExecuteMessage executeMessage : executeMessageList) {
             JudgeMessage judgeInfo =JudgeMessage.builder().build();
             String errorMessage = executeMessage.getErrorMessage();
             if (StrUtil.isNotBlank(errorMessage)) {
-                judgeInfo.setErrorMessage(codeErrorMsgUtil.parseUserCodeError(errorMessage));
+                String codeExceptionMsg = CodeExceptionEnum.matchError(errorMessage, lang);
+                errorMessage= codeExceptionMsg==null?errorMessage:codeExceptionMsg;
+                Integer status = SandBoxResponseStatus.getCodeResponseStatus(errorMessage);
+                judgeInfo.setErrorMessage(errorMessage);
                 // 用户提交的代码执行中存在错误
-                executeCodeResponse.setStatus(SandBoxResponseStatus.RUN_FAILED.getCode());
+                executeCodeResponse.setStatus(status);
                 judgeMessagesList.add(judgeInfo);
                 continue;
             }
@@ -197,9 +209,6 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         executeCodeResponse.setMaxTime(maxTime);
         executeCodeResponse.setMaxMemory(maxMemory);//kb
 
-        if (executeCodeResponse.getStatus()==null) {
-            executeCodeResponse.setStatus(SandBoxResponseStatus.SUCCESS.getCode());
-        }
         executeCodeResponse.setOutputList(outputList);
         executeCodeResponse.setJudgeMessageList(judgeMessagesList);
         return executeCodeResponse;

@@ -11,4 +11,5 @@ public class ExecuteDockerCmdResponse {
     private Long time;
     private Long maxMemory;
     private Boolean isOutTime;
+    private Boolean isOutputLimitExceeded;
 }
