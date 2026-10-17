@@ -1,7 +1,7 @@
 package com.lgg.yunpancodesandbox.enums;
 
 public enum SandBoxResponseStatus {
-    SUCCESS(0, "运行成功）"),
+    SUCCESS(0, "运行成功"),
     RUN_FAILED(1, "运行失败RE"),
     COMPILE_FAILED(2, "编译失败CE"),
     RUN_TIME_OUT(3, "运行超时TLE"),
@@ -33,4 +33,5 @@ public enum SandBoxResponseStatus {
         }
         return null;
     }
+
 }

@@ -2,7 +2,8 @@ package com.lgg.yunpancodesandbox.utils;
 
 import cn.hutool.core.util.StrUtil;
 import com.lgg.yunpancodesandbox.exception.BusinessException;
-import com.lgg.yunpancodesandbox.model.ExecuteMessage;
+import com.lgg.yunpancodesandbox.model.ExecuteCmdInfo;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
@@ -25,10 +26,10 @@ public class ProcessUtils {
      * @param runProcess
      * @return
      */
-    public static ExecuteMessage runProcessAndGetMessage(Process runProcess,Long outTime) {
+    public static ExecuteCmdInfo runProcessAndGetMessage(Process runProcess, Long outTime) {
         return runProcessAndGetMessage(runProcess,outTime,TimeUnit.MILLISECONDS);
     }
-    public static ExecuteMessage runProcessAndGetMessage(Process runProcess,Long outTime,TimeUnit unit) {
+    public static ExecuteCmdInfo runProcessAndGetMessage(Process runProcess, Long outTime, TimeUnit unit) {
         // ========== 异步消费 stdout 和 stderr，防止缓冲区满阻塞进程 ==========
         StringBuilder stdOutSb = new StringBuilder();
         StringBuilder stdErrSb = new StringBuilder();
@@ -84,7 +85,7 @@ public class ProcessUtils {
             String stdOut = stdOutSb.toString();
             String stdErr = stdErrSb.toString();
 
-            return ExecuteMessage.builder().errorMessage(stdErr)
+            return ExecuteCmdInfo.builder().errorMessage(stdErr)
                     .exitValue(exitValue).resultMessage(stdOut).build();
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage());
@@ -112,7 +113,7 @@ public class ProcessUtils {
      * @param args
      * @return
      */
-    public static ExecuteMessage runInteractProcessAndGetMessage(Process runProcess, String args) {
+    public static ExecuteCmdInfo runInteractProcessAndGetMessage(Process runProcess, String args) {
 //        ExecuteMessage executeMessage = new ExecuteMessage();
 
         try {
@@ -143,6 +144,6 @@ public class ProcessUtils {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return ExecuteMessage.builder().build();
+        return ExecuteCmdInfo.builder().build();
     }
 }

@@ -1,28 +1,24 @@
 package com.lgg.yunpancodesandbox.template;
 
-import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import com.lgg.yunpancodesandbox.CodeSandbox;
 
-import com.lgg.yunpancodesandbox.enums.CodeExceptionEnum;
+import com.lgg.yunpancodesandbox.enums.JavaCodeExceptionEnum;
 import com.lgg.yunpancodesandbox.enums.LanguageEnum;
 import com.lgg.yunpancodesandbox.enums.SandBoxResponseStatus;
 import com.lgg.yunpancodesandbox.enums.SandboxExceptionMsgEnum;
-import com.lgg.yunpancodesandbox.model.ExecuteCodeRequest;
-import com.lgg.yunpancodesandbox.model.ExecuteCodeResponse;
-import com.lgg.yunpancodesandbox.model.ExecuteMessage;
-import com.lgg.yunpancodesandbox.model.JudgeMessage;
+import com.lgg.yunpancodesandbox.model.*;
 import com.lgg.yunpancodesandbox.utils.CodeErrorMsgUtil;
 import com.lgg.yunpancodesandbox.utils.ProcessUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 
 import javax.annotation.Resource;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -51,7 +47,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
 //        1. 把用户的代码保存为文件
         File userCodeFile = saveCodeToFile(code);
 //        2. 编译代码，得到 class 文件
-        ExecuteMessage compileFileExecuteMessage = compileFile(userCodeFile);
+        ExecuteCmdInfo compileFileExecuteMessage = compileFile(userCodeFile);
         if (compileFileExecuteMessage.getExitValue()==null){
             return ExecuteCodeResponse.builder().status(SandBoxResponseStatus.COMPILE_TIMEOUT.getCode())
                     .compileErrorMessage(SandBoxResponseStatus.COMPILE_TIMEOUT.getMessage()).build();
@@ -66,7 +62,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         }
 
         // 3. 执行代码，得到输出结果
-        List<ExecuteMessage> executeMessageList = runFile(userCodeFile, inputList);
+        List<ExecuteCmdInfo> executeMessageList = runFile(userCodeFile, inputList);
 
 //        4. 收集整理输出结果
         ExecuteCodeResponse outputResponse = getOutputResponse(executeMessageList);
@@ -104,7 +100,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
      * @param userCodeFile
      * @return
      */
-    public ExecuteMessage compileFile(File userCodeFile) {
+    public ExecuteCmdInfo compileFile(File userCodeFile) {
         String compileCmd = String.format(LanguageEnum.JAVA.getCompileCmdTemplate(), userCodeFile.getAbsolutePath());
         try {
             Process compileProcess = Runtime.getRuntime().exec(compileCmd);
@@ -119,9 +115,9 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
      * @param inputList
      * @return
      */
-    public List<ExecuteMessage> runFile(File userCodeFile, List<String> inputList) {
+    public List<ExecuteCmdInfo> runFile(File userCodeFile, List<String> inputList) {
         String userCodeParentPath = userCodeFile.getParentFile().getAbsolutePath();
-        List<ExecuteMessage> executeMessageList = new ArrayList<>();
+        List<ExecuteCmdInfo> executeMessageList = new ArrayList<>();
 
         for (String inputArgs : inputList) {
             String runCmd = String.format("java -Xmx256m -Dfile.encoding=UTF-8 -cp %s Main %s", userCodeParentPath, inputArgs);
@@ -131,8 +127,10 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
 
                 Thread timeoutThread = getTimeOutThread(taskDone, runProcess);
 
-                ExecuteMessage executeMessage = ProcessUtils.runProcessAndGetMessage(runProcess,timeOut);
-                System.out.println(executeMessage);
+                ExecuteCmdInfo executeNativeMessage = ProcessUtils.runProcessAndGetMessage(runProcess,timeOut);
+                System.out.println(executeNativeMessage);
+                ExecuteCmdInfo executeMessage=ExecuteCmdInfo.builder().build();
+                BeanUtils.copyProperties(executeNativeMessage, executeMessage);
                 executeMessageList.add(executeMessage);
                 taskDone.set(true);
                 timeoutThread.interrupt();
@@ -167,49 +165,35 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
 
     /**
      * 4、获取输出结果
-     * @param executeMessageList
+     * @param executeCmdInfoList
      * @return
      */
-    public ExecuteCodeResponse getOutputResponse(List<ExecuteMessage> executeMessageList) {
+    public ExecuteCodeResponse getOutputResponse(List<ExecuteCmdInfo> executeCmdInfoList) {
         ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
-        List<String> outputList = new ArrayList<>();
-        List<JudgeMessage> judgeMessagesList = new ArrayList<>();
-        // 取用时最大值，便于判断是否超时
+        List<ExecuteCodeInfo> executeCodeInfoList = new ArrayList<>();
+
+        //设置判题状态
+        ExecuteCmdInfo executeCmdInfo = executeCmdInfoList.get(executeCmdInfoList.size() - 1);
+        executeCodeResponse.setStatus(executeCmdInfo.getStatus().getCode());
+
         long maxTime = 0;
         long maxMemory = 0L;
-
-        executeCodeResponse.setStatus(SandBoxResponseStatus.SUCCESS.getCode());
-        for (ExecuteMessage executeMessage : executeMessageList) {
-            JudgeMessage judgeInfo =JudgeMessage.builder().build();
-            String errorMessage = executeMessage.getErrorMessage();
-            if (StrUtil.isNotBlank(errorMessage)) {
-                String codeExceptionMsg = CodeExceptionEnum.matchError(errorMessage, lang);
-                errorMessage= codeExceptionMsg==null?errorMessage:codeExceptionMsg;
-                Integer status = SandBoxResponseStatus.getCodeResponseStatus(errorMessage);
-                judgeInfo.setErrorMessage(errorMessage);
-                // 用户提交的代码执行中存在错误
-                executeCodeResponse.setStatus(status);
-                judgeMessagesList.add(judgeInfo);
-                continue;
-            }
-            Long time = executeMessage.getTime();
-            long memory = executeMessage.getMaxMemory()/1024;
-            judgeInfo.setTime(time);
-            judgeInfo.setMemory(memory); //kb
-            outputList.add(executeMessage.getResultMessage());
-
+        for (ExecuteCmdInfo codeInfo : executeCmdInfoList) {
+            Long time = codeInfo.getTime();
+            Long memory = codeInfo.getMemory();
             if (time != null) {
                 maxTime = Math.max(maxTime, time);
             }
-            maxMemory = Math.max(maxMemory, memory);
-
-            judgeMessagesList.add(judgeInfo);
+            if (memory != null) {
+                maxMemory = Math.max(maxMemory, memory);
+            }
+            ExecuteCodeInfo executeCodeInfo=ExecuteCodeInfo.builder().build();
+            BeanUtils.copyProperties(codeInfo, executeCodeInfo);
+            executeCodeInfoList.add(executeCodeInfo);
         }
         executeCodeResponse.setMaxTime(maxTime);
         executeCodeResponse.setMaxMemory(maxMemory);//kb
-
-        executeCodeResponse.setOutputList(outputList);
-        executeCodeResponse.setJudgeMessageList(judgeMessagesList);
+        executeCodeResponse.setExecuteCodeInfoList(executeCodeInfoList);
         return executeCodeResponse;
     }
 

@@ -2,7 +2,7 @@ server:
   port: 8090
 
 code_sandbox:
-  max_output_bytes: 512
+  max_output_bytes: 256
   auth_request_header: X-Auth-Secret
   auth_request_secret: lgg
   time_out: 10000

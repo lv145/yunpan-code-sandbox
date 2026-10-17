@@ -1,8 +1,8 @@
 package com.lgg.yunpancodesandbox.language;
 
-import cn.hutool.core.io.resource.ResourceUtil;
 import cn.hutool.core.util.ArrayUtil;
 
+import cn.hutool.core.util.StrUtil;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.*;
@@ -14,13 +14,15 @@ import com.lgg.yunpancodesandbox.enums.LanguageEnum;
 import com.lgg.yunpancodesandbox.enums.SandBoxResponseStatus;
 import com.lgg.yunpancodesandbox.enums.SandboxExceptionMsgEnum;
 import com.lgg.yunpancodesandbox.exception.BusinessException;
-import com.lgg.yunpancodesandbox.exception.ThrowUtils;
-import com.lgg.yunpancodesandbox.model.ExecuteCodeRequest;
+import com.lgg.yunpancodesandbox.model.ExecuteCmdInfo;
+
+import com.lgg.yunpancodesandbox.model.ExecuteCodeInfo;
 import com.lgg.yunpancodesandbox.model.ExecuteCodeResponse;
-import com.lgg.yunpancodesandbox.model.ExecuteDockerCmdResponse;
 import com.lgg.yunpancodesandbox.template.JavaCodeSandboxTemplate;
-import com.lgg.yunpancodesandbox.model.ExecuteMessage;
+import com.lgg.yunpancodesandbox.utils.CodeErrorMsgUtil;
+import io.netty.util.internal.StringUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.tomcat.util.codec.binary.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
@@ -28,7 +30,6 @@ import org.springframework.util.StopWatch;
 import javax.annotation.Resource;
 import java.io.Closeable;
 import java.io.File;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -43,6 +44,9 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
     @Resource
     private DockerClient dockerClient;
     // 配置文件读取，例如 1024 * 1024 = 1MB
+
+    @Resource
+    private CodeErrorMsgUtil codeErrorMsgUtil;
 
     /**
      * 获取容器运行的内存峰值（单位：字节，转KB /1024）
@@ -87,12 +91,49 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
         Thread.sleep(800);
         return peakMemory.get();
     }
+
+    /**
+     * 4、获取输出结果
+     * @param executeCmdInfoList
+     * @return
+     */
+    @Override
+    public ExecuteCodeResponse getOutputResponse(List<ExecuteCmdInfo> executeCmdInfoList) {
+        ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
+        List<ExecuteCodeInfo> executeCodeInfoList = new ArrayList<>();
+
+        //设置判题状态
+        ExecuteCmdInfo executeCmdInfo = executeCmdInfoList.get(executeCmdInfoList.size() - 1);
+        executeCodeResponse.setStatus(executeCmdInfo.getStatus().getCode());
+
+        long maxTime = 0;
+        long maxMemory = 0L;
+        for (ExecuteCmdInfo codeInfo : executeCmdInfoList) {
+            Long time = codeInfo.getTime();
+            Long memory = codeInfo.getMemory();
+            if (time != null) {
+                maxTime = Math.max(maxTime, time);
+            }
+            if (memory != null) {
+                maxMemory = Math.max(maxMemory, memory);
+            }
+            ExecuteCodeInfo executeCodeInfo=ExecuteCodeInfo.builder().build();
+            BeanUtils.copyProperties(codeInfo, executeCodeInfo);
+            executeCodeInfoList.add(executeCodeInfo);
+
+        }
+        executeCodeResponse.setMaxTime(maxTime);
+        executeCodeResponse.setMaxMemory(maxMemory);//kb
+        executeCodeResponse.setExecuteCodeInfoList(executeCodeInfoList);
+        return executeCodeResponse;
+    }
+
     /**
      * 2、在容器中运行命令
      * @param cmdArray
      * @return
      */
-    public ExecuteDockerCmdResponse executeDockerCmd(String[] cmdArray,String containerId) {
+    public ExecuteCmdInfo executeDockerCmd(String[] cmdArray, String containerId) {
         // 改成数组存放StringBuilder
         AtomicBoolean oleFlag = new AtomicBoolean(false);//输出超限表示
         final StringBuilder[] resultSb = {new StringBuilder()};
@@ -133,14 +174,15 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
         long time;
         StopWatch stopWatch = new StopWatch();
         boolean isCompleted;
-        long maxMemory;
+        long memory;
         try {
             stopWatch.start();
             isCompleted = dockerClient.execStartCmd(execId)
                     .exec(execStartResultCallback)
                     .awaitCompletion(timeOut, TimeUnit.MILLISECONDS);
             stopWatch.stop();
-            maxMemory = getContainerMaxMemory(dockerClient, containerId);
+
+            memory = getContainerMaxMemory(dockerClient, containerId);
         }catch (InterruptedException e) {
             stopWatch.stop();
             throw  new BusinessException(ErrorCode.SYSTEM_ERROR,SandboxExceptionMsgEnum.SANDBOX_DOCKER_ERROR.getMessage());
@@ -150,17 +192,21 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
         // 取出完整内容
         String resultMessage = resultSb[0].toString().replaceAll("[\\r\\n]+$", "");
         String errorMessage = errorSb[0].toString();
-        return ExecuteDockerCmdResponse.builder().time(time).errorMessage(errorMessage).isOutTime(!isCompleted)
-                .maxMemory(maxMemory).resultMessage(resultMessage).isOutputLimitExceeded(oleFlag.get()).build();
+
+        return ExecuteCmdInfo.builder().status(SandBoxResponseStatus.SUCCESS)
+                .errorMessage(errorMessage) .resultMessage(resultMessage)
+                .memory(memory/1024) //kb
+                .time(time).isRunFailed(StrUtil.isNotBlank(errorMessage))
+                .isOutTime(!isCompleted).isOutputLimitExceeded(oleFlag.get()).build();
     }
     @Override
-    public List<ExecuteMessage> runFile(File userCodeFile, List<String> inputList) {
+    public List<ExecuteCmdInfo> runFile(File userCodeFile, List<String> inputList) {
         String userCodeParentPath = userCodeFile.getParentFile().getAbsolutePath();
         String image = LanguageEnum.JAVA.getImageName();
         // ==========1. 检查镜像，不存在才拉取==========
         pullImage(image);
 
-        List<ExecuteMessage> executeMessageList = new ArrayList<>();
+        List<ExecuteCmdInfo> executeCmdInfoList= new ArrayList<>();
         // ==========循环执行多组输入用例==========
         for (String inputArgs : inputList) {
             // 容器ID，finally里面用来清理
@@ -176,23 +222,41 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                 // ==========5. 拼接命令==========
                 String[] inputArgsArray = inputArgs.split(" ");
                 String[] cmdArray = ArrayUtil.append(LanguageEnum.JAVA.getRunCmdTemplate().split(" "), inputArgsArray);
-                ExecuteDockerCmdResponse executeDockerCmdResponse = executeDockerCmd(cmdArray, containerId);
-                if (executeDockerCmdResponse.getIsOutputLimitExceeded()) {
-                    System.out.println("执行用例输出超限，限制长度：" + maxOutputBytes );
-                    executeMessageList.add(ExecuteMessage.builder()
-                            .errorMessage(SandBoxResponseStatus.OUTPUT_LIMIT_EXCEEDED.getMessage()).build());
+                ExecuteCmdInfo executeCmdInfo = executeDockerCmd(cmdArray, containerId);
+                if (executeCmdInfo.getIsRunFailed()){
+                    String errorMessage =codeErrorMsgUtil.parseUserCodeError(executeCmdInfo.getErrorMessage());
+                    log.info("运行出现错误:{}", errorMessage);
+                    // 修剪末尾换行
+                    executeCmdInfo.setErrorMessage(errorMessage);
+                    executeCmdInfo.setStatus(SandBoxResponseStatus.RUN_FAILED);
+
+                    executeCmdInfoList.add(executeCmdInfo);
                     break;
                 }
-                if (executeDockerCmdResponse.getIsOutTime()) {
-                    System.out.println("执行用例超时，限制时间：" + timeOut + "ms");
-                    executeMessageList.add(ExecuteMessage.builder()
-                            .errorMessage(SandBoxResponseStatus.RUN_TIME_OUT.getMessage()).build());
+
+                if (executeCmdInfo.getIsOutputLimitExceeded()) {
+                    log.info("执行用例输出超限，限制长度：{}" , maxOutputBytes );
+                    // 修剪末尾换行
+                    SandBoxResponseStatus outputLimitExceeded = SandBoxResponseStatus.OUTPUT_LIMIT_EXCEEDED;
+                    executeCmdInfo.setErrorMessage(outputLimitExceeded.getMessage());
+                    executeCmdInfo.setStatus(outputLimitExceeded);
+
+                    executeCmdInfoList.add(executeCmdInfo);
                     break;
                 }
-                ExecuteMessage executeMessage = ExecuteMessage.builder().build();
-                // 修剪末尾换行
-                BeanUtils.copyProperties(executeDockerCmdResponse, executeMessage);
-                executeMessageList.add(executeMessage);
+                if (executeCmdInfo.getIsOutTime()) {
+                    log.info("执行用例超时，限制时间：{}" , timeOut +"ms");
+                    SandBoxResponseStatus runTimeOut = SandBoxResponseStatus.RUN_TIME_OUT;
+                    executeCmdInfo.setErrorMessage(runTimeOut.getMessage());
+                    executeCmdInfo.setStatus(runTimeOut);
+
+                    executeCmdInfoList.add(executeCmdInfo);
+                    break;
+                }
+
+                ExecuteCmdInfo info = ExecuteCmdInfo.builder().build();
+                BeanUtils.copyProperties(executeCmdInfo, info);
+                executeCmdInfoList.add(info);
             }catch (Exception e) {
                 log.error("用例执行异常:{}", e.getMessage());
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR,SandboxExceptionMsgEnum.SANDBOX_DOCKER_ERROR.getMessage());
@@ -201,7 +265,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
             }
         }
 
-        return executeMessageList;
+        return executeCmdInfoList;
     }
 
 

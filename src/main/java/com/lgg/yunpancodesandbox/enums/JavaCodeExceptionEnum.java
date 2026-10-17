@@ -2,7 +2,7 @@ package com.lgg.yunpancodesandbox.enums;
 
 import org.apache.commons.lang3.StringUtils;
 
-public enum CodeExceptionEnum {
+public enum JavaCodeExceptionEnum {
     NUMBER_FORMAT_EXCEPTION("NumberFormatException", "数字格式异常：字符串无法转为数字", "Number format exception: cannot convert string to number"),
     NULL_POINTER_EXCEPTION("NullPointerException", "空指针异常", "Null pointer exception"),
     ARRAY_INDEX_OUT_OF_BOUNDS("ArrayIndexOutOfBoundsException", "数组下标越界", "Array index out of bounds"),
@@ -24,7 +24,7 @@ public enum CodeExceptionEnum {
     /** 英文提示 */
     private final String enMsg;
 
-    CodeExceptionEnum(String keyword, String cnMsg, String enMsg) {
+    JavaCodeExceptionEnum(String keyword, String cnMsg, String enMsg) {
         this.keyword = keyword;
         this.cnMsg = cnMsg;
         this.enMsg = enMsg;
@@ -50,7 +50,7 @@ public enum CodeExceptionEnum {
      */
     public static String matchError(String stderr, String lang) {
         String err = stderr.trim();
-        for (CodeExceptionEnum e : CodeExceptionEnum.values()) {
+        for (JavaCodeExceptionEnum e : JavaCodeExceptionEnum.values()) {
             String keyword = e.getKeyword();
             if (StringUtils.isBlank(keyword)) {
                 continue;
