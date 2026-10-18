@@ -1,5 +1,6 @@
 package com.lgg.yunpancodesandbox.template;
 
+import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import com.lgg.yunpancodesandbox.CodeSandbox;
@@ -49,16 +50,19 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
 //        2. 编译代码，得到 class 文件
         ExecuteCmdInfo compileFileExecuteMessage = compileFile(userCodeFile);
         if (compileFileExecuteMessage.getExitValue()==null){
+            ExecuteCodeInfo executeCodeInfo = ExecuteCodeInfo.builder()
+                    .errorMessage(SandBoxResponseStatus.COMPILE_TIMEOUT.getMessage()).build();
             return ExecuteCodeResponse.builder().status(SandBoxResponseStatus.COMPILE_TIMEOUT.getCode())
-                    .compileErrorMessage(SandBoxResponseStatus.COMPILE_TIMEOUT.getMessage()).build();
+                    .executeCodeInfoList(Collections.singletonList(executeCodeInfo)).build();
         }
         if (compileFileExecuteMessage.getExitValue()!=0){
             deleteFile(userCodeFile);
-            String errorMessage= codeErrorMsgUtil
-                    .filterCompileMessage(compileFileExecuteMessage
-                            .getErrorMessage());
+            String errorMessage= codeErrorMsgUtil.filterCompileMessage(
+                            compileFileExecuteMessage.getErrorMessage());
+            ExecuteCodeInfo executeCodeInfo = ExecuteCodeInfo.builder()
+                    .errorMessage(errorMessage).build();
            return ExecuteCodeResponse.builder().status(SandBoxResponseStatus.COMPILE_FAILED.getCode())
-                    .compileErrorMessage(errorMessage).build();
+                   .executeCodeInfoList(Collections.singletonList(executeCodeInfo)).build();
         }
 
         // 3. 执行代码，得到输出结果

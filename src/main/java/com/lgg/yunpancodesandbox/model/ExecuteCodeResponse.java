@@ -20,10 +20,8 @@ public class ExecuteCodeResponse {
      * 执行状态
      */
     private Integer status;
-
     private Long maxMemory;
     private Long maxTime;
-    private String compileErrorMessage;
     /**
      * 判题信息
      */
