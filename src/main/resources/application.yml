@@ -1,12 +1,13 @@
 server:
   port: 8090
 
-code_sandbox:
-  max_output_bytes: 256
-  auth_request_header: X-Auth-Secret
-  auth_request_secret: lgg
-  time_out: 10000
-  global_code_dir_name: tmpCode
-  global_java_class_name: Main.java
-  jvm_error_lang: en #zh en
+code-sandbox:
+  max-output-length: 512
+  auth-request-header: X-Auth-Secret
+  auth-request-secret: lgg
+  time-out: 10000
+  global-code-dir-name: tmpCode
+  global-docker-code-dir-path: /app
+  global-file-name: Main
 
+  error-lang: en #zh en

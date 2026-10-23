@@ -5,15 +5,18 @@ import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.github.dockerjava.transport.DockerHttpClient;
+import com.lgg.yunpancodesandbox.utils.DockerUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.core.DockerClientBuilder;
 
 import java.time.Duration;
 
 @Configuration
+@Slf4j
 public class DockerClientConfig {
+
 
     @Bean
     public DockerClient dockerClient() {
@@ -31,7 +34,25 @@ public class DockerClientConfig {
                 .build();
 
         // 3. 构造DockerClient，显式传入httpClient
-        DockerClient dockerClient = DockerClientImpl.getInstance(config, httpClient);
-        return dockerClient;
+        return DockerClientImpl.getInstance(config, httpClient);
     }
+
+    @Bean
+    public CommandLineRunner prePullImageRunner(DockerClient dockerClient, DockerFlagManager dockerFlagManager) {
+        return args -> {
+            // 新开线程执行pull，主线程不卡
+            new Thread(() -> {
+                try {
+                   DockerUtils.pullLanguageImages(dockerClient, dockerFlagManager);
+                    log.info("镜像{}异步拉取成功", dockerFlagManager);
+                } catch (Exception e) {
+                    log.error("镜像{}异步拉取失败", dockerFlagManager.toString(),e);
+                }
+            }).start();
+        };
+    }
+
+
+
+
 }

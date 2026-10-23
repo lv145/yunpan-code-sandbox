@@ -1,20 +1,17 @@
-package com.lgg.yunpancodesandbox.template;
+package com.lgg.yunpancodesandbox.sandbox.template;
 
-import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.StrUtil;
-import com.lgg.yunpancodesandbox.CodeSandbox;
+import com.lgg.yunpancodesandbox.sandbox.CodeSandbox;
 
-import com.lgg.yunpancodesandbox.enums.JavaCodeExceptionEnum;
 import com.lgg.yunpancodesandbox.enums.LanguageEnum;
 import com.lgg.yunpancodesandbox.enums.SandBoxResponseStatus;
 import com.lgg.yunpancodesandbox.enums.SandboxExceptionMsgEnum;
 import com.lgg.yunpancodesandbox.model.*;
+import com.lgg.yunpancodesandbox.sandbox.CodeSandboxProperties;
 import com.lgg.yunpancodesandbox.utils.CodeErrorMsgUtil;
 import com.lgg.yunpancodesandbox.utils.ProcessUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Value;
 
 import javax.annotation.Resource;
 import java.io.File;
@@ -26,17 +23,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Java 代码沙箱模板方法的实现
  */
 @Slf4j
-public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
-    @Value("${code_sandbox.jvm_error_lang}")
-    public String lang ;
-    @Value("${code_sandbox.global_code_dir_name}")
-    private  String globalCodeDirName;
-    @Value("${code_sandbox.global_java_class_name}")
-    private  String globalJavaClassName ;
-    @Value("${code_sandbox.time_out}")
-    public  long timeOut ;
-    @Value("${code_sandbox.max_output_bytes}")
-    public long  maxOutputBytes;
+public abstract class NativeCodeSandboxTemplate implements CodeSandbox {
+
+    @Resource
+    private CodeSandboxProperties properties;
     @Resource
     CodeErrorMsgUtil codeErrorMsgUtil;
 
@@ -57,7 +47,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         }
         if (compileFileExecuteMessage.getExitValue()!=0){
             deleteFile(userCodeFile);
-            String errorMessage= codeErrorMsgUtil.filterCompileMessage(
+            String errorMessage= codeErrorMsgUtil.filterPathToFileName(
                             compileFileExecuteMessage.getErrorMessage());
             ExecuteCodeInfo executeCodeInfo = ExecuteCodeInfo.builder()
                     .errorMessage(errorMessage).build();
@@ -87,7 +77,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
      */
     public File saveCodeToFile(String code) {
         String userDir = System.getProperty("user.dir");
-        String globalCodePathName = userDir + File.separator + globalCodeDirName;
+        String globalCodePathName = userDir + File.separator + properties.getGlobalFileName();
         // 判断全局代码目录是否存在，没有则新建
         if (!FileUtil.exist(globalCodePathName)) {
             FileUtil.mkdir(globalCodePathName);
@@ -95,7 +85,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
 
         // 把用户的代码隔离存放
         String userCodeParentPath = globalCodePathName + File.separator + UUID.randomUUID();
-        String userCodePath = userCodeParentPath + File.separator + globalJavaClassName;
+        String userCodePath = userCodeParentPath + File.separator + properties.getGlobalFileName();
         return FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8);
     }
 
@@ -108,7 +98,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         String compileCmd = String.format(LanguageEnum.JAVA.getCompileCmdTemplate(), userCodeFile.getAbsolutePath());
         try {
             Process compileProcess = Runtime.getRuntime().exec(compileCmd);
-            return ProcessUtils.runProcessAndGetMessage(compileProcess,timeOut);
+            return ProcessUtils.runProcessAndGetMessage(compileProcess, properties.getTimeOut());
         } catch (Exception e) {
             throw new RuntimeException(SandboxExceptionMsgEnum.COMPILE_ERROR.getMessage()+":"+e.getMessage());
         }
@@ -131,7 +121,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
 
                 Thread timeoutThread = getTimeOutThread(taskDone, runProcess);
 
-                ExecuteCmdInfo executeNativeMessage = ProcessUtils.runProcessAndGetMessage(runProcess,timeOut);
+                ExecuteCmdInfo executeNativeMessage = ProcessUtils.runProcessAndGetMessage(runProcess,properties.getTimeOut());
                 System.out.println(executeNativeMessage);
                 ExecuteCmdInfo executeMessage=ExecuteCmdInfo.builder().build();
                 BeanUtils.copyProperties(executeNativeMessage, executeMessage);
@@ -149,7 +139,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
     private Thread getTimeOutThread(AtomicBoolean taskDone, Process runProcess) {
         Thread timeoutThread = new Thread(() -> {
             try {
-                Thread.sleep(timeOut);
+                Thread.sleep(properties.getMaxOutputLength());
                 if (!taskDone.get() && runProcess.isAlive()) {
                     System.out.println("超时了，中断");
                     runProcess.destroy();
