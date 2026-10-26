@@ -117,7 +117,7 @@ public abstract class DockerCodeSandboxTemplate implements CodeSandbox {
             String compileCmd = getLanguage().getCompileCmd(containerFilePath,
                     workDir, properties.getGlobalFileName());
 
-            return DockerUtils.executeDockerCmd(dockerClient,compileCmd.split("\\s+"), containerId,properties);
+            return DockerUtils.executeDockerCmd(dockerClient,compileCmd.split("\\s+"), containerId,properties,null);
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR,
                     SandboxExceptionMsgEnum.COMPILE_ERROR.getMessage());
@@ -131,7 +131,7 @@ public abstract class DockerCodeSandboxTemplate implements CodeSandbox {
 
         List<ExecuteCmdInfo> executeCmdInfoList= new ArrayList<>();
         // ==========循环执行多组输入用例==========
-        for (String inputArgs : inputList) {
+        for (String inputText : inputList) {
             // 容器ID，finally里面用来清理
             String containerId = null;
             try {
@@ -139,15 +139,14 @@ public abstract class DockerCodeSandboxTemplate implements CodeSandbox {
 
                 containerId = DockerUtils.createContainer(dockerClient,image,
                         globalCodeDirPath,properties.getGlobalDockerCodeDirPath(),false);
-                log.info("创建容器成功containerId: {}", containerId);
+
                 // ==========5. 拼接命令==========
-                String[] inputArgsArray = inputArgs.split(" ");
+                String[] inputArgsArray = inputText.split(" ");
 
                 String runCmd = getLanguage().getRunCmd(containerFilePath,
                         workDir, properties.getGlobalFileName());
                 String[] cmdArray = ArrayUtil.append(runCmd.split(" "), inputArgsArray);
-                ExecuteCmdInfo executeCmdInfo = DockerUtils.executeDockerCmd(dockerClient,cmdArray, containerId,properties);
-                log.info(executeCmdInfoList.toString());
+                ExecuteCmdInfo executeCmdInfo = DockerUtils.executeDockerCmd(dockerClient,cmdArray, containerId,properties,inputText);
                 ExecuteCmdInfo info = ExecuteCmdInfo.builder().build();
                 BeanUtils.copyProperties(executeCmdInfo, info);
                 executeCmdInfoList.add(info);

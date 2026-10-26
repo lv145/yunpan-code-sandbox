@@ -1,12 +1,10 @@
 package com.lgg.yunpancodesandbox.utils;
 
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
-import com.github.dockerjava.api.command.CreateContainerCmd;
-import com.github.dockerjava.api.command.CreateContainerResponse;
-import com.github.dockerjava.api.command.ExecCreateCmdResponse;
-import com.github.dockerjava.api.command.PullImageResultCallback;
+import com.github.dockerjava.api.command.*;
 import com.github.dockerjava.api.exception.NotModifiedException;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.command.ExecStartResultCallback;
@@ -22,9 +20,12 @@ import com.lgg.yunpancodesandbox.sandbox.CodeSandboxProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StopWatch;
 
+import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -89,13 +90,13 @@ public class DockerUtils {
      * 在容器中执行命令，同时采集标准输出、错误输出、耗时和内存峰值。
      */
     public static ExecuteCmdInfo executeDockerCmd(DockerClient dockerClient,String[] cmdArray,
-                                                  String containerId, CodeSandboxProperties properties) {
+                                                  String containerId, CodeSandboxProperties properties,String inputText) {
 
         AtomicBoolean outputLimitExceeded = new AtomicBoolean(false);
         StringBuilder resultBuilder = new StringBuilder();
         StringBuilder errorBuilder = new StringBuilder();
         ExecCreateCmdResponse execResponse = dockerClient.execCreateCmd(containerId)
-                .withCmd(cmdArray).withAttachStderr(true)
+                .withCmd(cmdArray).withAttachStderr(true).withAttachStdin(true)
                 .withAttachStdout(true).exec();
         //创建回调
         DockerCmdResultCallback callback=new DockerCmdResultCallback(resultBuilder,errorBuilder,
@@ -106,10 +107,17 @@ public class DockerUtils {
         StopWatch stopWatch = new StopWatch();
         boolean isCompleted;
         long memory;
+
         try {
+            ExecStartCmd execStartCmd = dockerClient.execStartCmd(execResponse.getId());
+            if (StrUtil.isNotBlank(inputText)) {
+                String formatInputText = StdinNormalizeUtil.formattingParameter(inputText);
+                execStartCmd.withStdIn(new ByteArrayInputStream(formatInputText.getBytes(StandardCharsets.UTF_8)));
+            }
             stopWatch.start();
-            isCompleted = dockerClient.execStartCmd(execResponse.getId())
-                    .exec(callback).awaitCompletion(properties.getTimeOut(), TimeUnit.MILLISECONDS);
+
+            isCompleted = execStartCmd.exec(callback)
+                    .awaitCompletion(properties.getTimeOut(), TimeUnit.MILLISECONDS);
             stopWatch.stop();
             memory = getContainerMaxMemory(dockerClient, containerId);
         } catch (InterruptedException e) {
@@ -166,20 +174,31 @@ public class DockerUtils {
                 .withShowAll(true) // false：只看running
                 .withNameFilter(Collections.singletonList(imageWithTag))
                 .exec();
-        log.info("Containers: {}", list);
         return list.isEmpty() ? null : list.get(0);
     }
 
     /** 创建受限容器：限制内存和 CPU、关闭网络。 */
     public static String createContainer(DockerClient dockerClient,String imageName, String userCodeParentPath,
                                          String globalDockerCodeDirName ,Boolean isCompile) {
+         Map<String, String>  logOpts = new HashMap<>();
+        logOpts.put("max-size", "2m");
+        logOpts.put("max-file", "1");
+        LogConfig logConfig = new LogConfig(LogConfig.LoggingType.JSON_FILE, logOpts);
         HostConfig hostConfig = new HostConfig()
                 .withMemory(100 * 1000 * 1000L)
-                .withMemorySwap(0L)
+                .withMemorySwap(100 * 1000 * 1000L)
+                .withCapDrop(Capability.ALL)
+                .withSecurityOpts(Collections.singletonList("no-new-privileges:true"))
+                .withReadonlyRootfs(true)
+                .withPidsLimit(32L)
+                .withTmpFs(Collections.singletonMap("/tmp", "size=64m,noexec,nosuid,nodev"))
                 .withCpuCount(1L)
-                .withBinds(new Bind(userCodeParentPath, new Volume(globalDockerCodeDirName)));
+                .withNanoCPUs(1_000_000_000L)
+                .withLogConfig(logConfig)
+                .withBinds(new Bind(userCodeParentPath, new Volume(globalDockerCodeDirName),AccessMode.ro));
         CreateContainerCmd cmd = dockerClient
                 .createContainerCmd(imageName)
+                .withUser("1000")
                 .withHostConfig(hostConfig)
                 .withNetworkDisabled(true)
                 .withAttachStderr(true);
@@ -195,7 +214,7 @@ public class DockerUtils {
                 return exec.getId();
             }
 
-            log.info("compileContainerStatus:{}",container.getStatus());
+
             if (container.getState().equals(DOCKER_STATE_RUNNING)) {
                 return container.getId();
             }
