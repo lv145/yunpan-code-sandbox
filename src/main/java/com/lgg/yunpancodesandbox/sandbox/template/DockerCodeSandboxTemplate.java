@@ -2,6 +2,7 @@ package com.lgg.yunpancodesandbox.sandbox.template;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.ArrayUtil;
+import cn.hutool.core.util.IdUtil;
 import com.github.dockerjava.api.DockerClient;
 import com.lgg.yunpancodesandbox.sandbox.CodeSandbox;
 import com.lgg.yunpancodesandbox.common.ErrorCode;
@@ -95,13 +96,40 @@ public abstract class DockerCodeSandboxTemplate implements CodeSandbox {
         }
     }
 
-    /** 将用户代码保存到随机目录，避免不同请求之间互相覆盖。 */
+//    /** 将用户代码保存到随机目录，避免不同请求之间互相覆盖。 */
+//    protected File saveCodeToFile(String code) {
+//        String userCodePath= globalCodeDirPath +File.separator + UUID.randomUUID()+
+//                File.separator + properties.getGlobalFileName()+getLanguage().getFileSuffix();
+//        return FileUtil.writeString(code, userCodePath , StandardCharsets.UTF_8);
+//    }
+    /**
+     * 将用户代码保存到随机目录，避免不同请求之间互相覆盖。
+     * @return 代码文件File
+     */
     protected File saveCodeToFile(String code) {
-        String userCodePath= globalCodeDirPath +File.separator + UUID.randomUUID()+
-                File.separator + properties.getGlobalFileName()+getLanguage().getFileSuffix();
-        return FileUtil.writeString(code, userCodePath , StandardCharsets.UTF_8);
-    }
+        // 示例，限制源码最大 256KB
+        ThrowUtils.throwIf(code.length() >256 * 1024,ErrorCode.PARAMS_ERROR, "代码过长");
 
+        // 用hutool的UUID，和UUID.randomUUID等价
+        String uuid = IdUtil.fastSimpleUUID();
+        File codeDir = FileUtil.file(globalCodeDirPath, uuid);
+        // 显式创建目录
+        FileUtil.mkdir(codeDir);
+
+        String fileName = properties.getGlobalFileName() + getLanguage().getFileSuffix();
+        File codeFile = FileUtil.file(codeDir, fileName);
+        try {
+            FileUtil.writeString(code, codeFile, StandardCharsets.UTF_8);
+            // 可选：权限收紧，linux下 0600，仅所有者读写
+            codeFile.setReadable(true, true);
+            codeFile.setWritable(true, true);
+            codeFile.setExecutable(false, false);
+        } catch (Exception e) {
+            // 抛出你自己的业务异常，比如代码保存失败
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户代码文件写入失败");
+        }
+        return codeFile;
+    }
     /** 在独立容器中编译需要编译的语言，Python3 直接返回成功。 */
     private ExecuteCmdInfo compileFile(String containerFilePath,String workDir) {
         if (!getLanguage().needCompile()) {
