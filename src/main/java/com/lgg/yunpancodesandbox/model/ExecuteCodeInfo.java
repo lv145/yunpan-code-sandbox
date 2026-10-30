@@ -1,10 +1,7 @@
 package com.lgg.yunpancodesandbox.model;
 
-import com.lgg.yunpancodesandbox.enums.SandBoxResponseStatus;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
+
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 /**

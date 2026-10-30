@@ -2,8 +2,7 @@ package com.lgg.yunpancodesandbox.exception;
 
 
 import com.lgg.yunpancodesandbox.common.ErrorCode;
-import com.lgg.yunpancodesandbox.enums.SandBoxResponseStatus;
-import com.lgg.yunpancodesandbox.enums.SandboxExceptionMsgEnum;
+
 
 /**
  * 自定义异常类

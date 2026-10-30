@@ -1,4 +1,4 @@
-package com.lgg.yunpancodesandbox.enums;
+package com.lgg.yunpancodesandbox.model.enums;
 
 public enum SandBoxResponseStatus {
     SUCCESS(0, "运行成功"),

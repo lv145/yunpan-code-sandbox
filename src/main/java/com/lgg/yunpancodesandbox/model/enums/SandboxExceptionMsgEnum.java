@@ -1,4 +1,4 @@
-package com.lgg.yunpancodesandbox.enums;
+package com.lgg.yunpancodesandbox.model.enums;
 
 import lombok.Getter;
 
