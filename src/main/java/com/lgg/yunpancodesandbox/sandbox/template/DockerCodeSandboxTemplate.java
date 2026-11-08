@@ -49,13 +49,6 @@ public abstract class DockerCodeSandboxTemplate implements CodeSandbox {
 
     /** 返回当前沙箱对应的语言配置，包括镜像、编译命令和运行命令。 */
     protected abstract LanguageEnum getLanguage();
-    private  String globalCodeDirPath;
-    @PostConstruct
-    public void initPattern() {
-        globalCodeDirPath = System.getProperty("user.dir") + File.separator +
-                properties.getGlobalCodeDirName();
-
-    }
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest executeCodeRequest) {
         //判断语言docker镜像环境是否就绪
@@ -111,7 +104,7 @@ public abstract class DockerCodeSandboxTemplate implements CodeSandbox {
 
         // 用hutool的UUID，和UUID.randomUUID等价
         String uuid = IdUtil.fastSimpleUUID();
-        File codeDir = FileUtil.file(globalCodeDirPath, uuid);
+        File codeDir = FileUtil.file(properties.getGlobalCodeDirPath(),uuid);
         // 显式创建目录
         FileUtil.mkdir(codeDir);
 
@@ -124,6 +117,8 @@ public abstract class DockerCodeSandboxTemplate implements CodeSandbox {
             codeFile.setWritable(true, true);
             codeFile.setExecutable(false, false);
         } catch (Exception e) {
+            log.error("写入用户代码失败，目录：{}，文件：{}",
+                    codeDir.getAbsolutePath(), codeFile.getAbsolutePath(), e);
             // 抛出你自己的业务异常，比如代码保存失败
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户代码文件写入失败");
         }
@@ -138,8 +133,7 @@ public abstract class DockerCodeSandboxTemplate implements CodeSandbox {
         String imageName = language.getImageName();
         String containerId = null;
         try {
-            containerId = DockerUtils.createContainer(dockerClient,imageName,
-                    globalCodeDirPath,properties.getGlobalDockerCodeDirPath(),true);
+            containerId = DockerUtils.createContainer(dockerClient,imageName,properties.getGlobalCodeDirPath(),properties.getGlobalDockerCodeDirPath(),true);
 
             String compileCmd = getLanguage().getCompileCmd(containerFilePath,
                     workDir, properties.getGlobalFileName());
@@ -165,7 +159,7 @@ public abstract class DockerCodeSandboxTemplate implements CodeSandbox {
                 // ==========2. 创建容器==========
 
                 containerId = DockerUtils.createContainer(dockerClient,image,
-                        globalCodeDirPath,properties.getGlobalDockerCodeDirPath(),false);
+                        properties.getGlobalCodeDirPath(),properties.getGlobalDockerCodeDirPath(),false);
 
                 // ==========5. 拼接命令==========
                 String[] inputArgsArray = inputText.split(" ");

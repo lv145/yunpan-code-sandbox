@@ -33,9 +33,9 @@ public class CodeSandboxProperties {
     private Long timeOut;
 
     /**
-     * 本地临时代码目录名 tmpCode
+     * 本地临时代码目录 tmpCode
      */
-    private String globalCodeDirName;
+    private String globalCodeDirPath;
 
     /**
      * Docker容器内代码目录 /app

@@ -38,17 +38,15 @@ public class DockerClientConfig {
     }
 
     @Bean
-    public CommandLineRunner prePullImageRunner(DockerClient dockerClient, DockerFlagManager dockerFlagManager) {
+    public CommandLineRunner checkImagesExists(DockerClient dockerClient, DockerFlagManager dockerFlagManager) {
         return args -> {
-            // 新开线程执行pull，主线程不卡
-            new Thread(() -> {
-                try {
-                   DockerUtils.pullLanguageImages(dockerClient, dockerFlagManager);
-                    log.info("镜像{}异步拉取成功", dockerFlagManager);
-                } catch (Exception e) {
-                    log.error("镜像{}异步拉取失败", dockerFlagManager.toString(),e);
-                }
-            }).start();
+            try {
+                DockerUtils.checkImagesExists(dockerClient, dockerFlagManager);
+                log.info("镜像状态:{}", dockerFlagManager);
+            }catch (Exception e) {
+                log.info("docker服务异常:{}", dockerFlagManager);
+            }
+
         };
     }
 

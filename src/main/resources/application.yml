@@ -4,9 +4,9 @@ server:
 code-sandbox:
   max-output-length: 512
   auth-request-header: X-Auth-Secret
-  auth-request-secret: lgg
+  auth-request-secret: Lggggg
   time-out: 10000
-  global-code-dir-name: tmpCode
+  global-code-dir-path: /www/yunpanoj/tmpCode
   global-docker-code-dir-path: /app
   global-file-name: Main
 

@@ -14,7 +14,7 @@ public enum LanguageEnum {
     ),
     C(
             "c",
-            "alpine-gcc:lastest",
+            "alpine-gcc:latest",
             ".c",
             "gcc %1$s -o %2$s/%3$s -O2 -Wall",
             "%2$s/%3$s"

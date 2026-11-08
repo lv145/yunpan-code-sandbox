@@ -187,14 +187,14 @@ public class DockerUtils {
                 .withSecurityOpts(Collections.singletonList("no-new-privileges:true"))
                 .withReadonlyRootfs(true)
                 .withPidsLimit(32L)
-                .withTmpFs(Collections.singletonMap("/tmp", "size=64m,noexec,nosuid,nodev"))
+                .withTmpFs(Collections.singletonMap("/tmp", "size=32m,nosuid,nodev"))
                 .withCpuCount(1L)
                 .withNanoCPUs(1_000_000_000L)
                 .withLogConfig(logConfig)
-                .withBinds(new Bind(userCodeParentPath, new Volume(globalDockerCodeDirName),AccessMode.ro));
+                .withBinds(new Bind(userCodeParentPath, new Volume(globalDockerCodeDirName),AccessMode.rw));
         CreateContainerCmd cmd = dockerClient
                 .createContainerCmd(imageName)
-                .withUser("1000")
+                .withUser("1000:1000")
                 .withHostConfig(hostConfig)
                 .withNetworkDisabled(true)
                 .withAttachStderr(true);
@@ -242,28 +242,8 @@ public class DockerUtils {
         }
     }
 
-    /** 本地不存在目标镜像时再拉取，避免每次请求重复下载。 */
-    public static void pullLanguageImages(DockerClient dockerClient, DockerFlagManager dockerFlagManager) {
-        String imageName;
-        try {
-            checkImagesExists(dockerClient, dockerFlagManager);
-            for (LanguageEnum value : LanguageEnum.values()) {
-                //默认false
-                imageName = value.getImageName();
-                if (dockerFlagManager.isImageReady(imageName)) {
-                    continue;
-                }
-                dockerClient.pullImageCmd(imageName).exec(new PullImageResultCallback())
-                        .awaitCompletion(360, TimeUnit.SECONDS);
-                dockerFlagManager.markSuccess(imageName);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, SandboxExceptionMsgEnum.DOCKER_UPLOAD_IMAGES_ERROR.getMessage());
-        }
-    }
     //将已存在镜像状态设置未true;
-    private static void checkImagesExists(DockerClient dockerClient, DockerFlagManager dockerFlagManager) {
+    public static void checkImagesExists(DockerClient dockerClient, DockerFlagManager dockerFlagManager) {
         List<Image> images = dockerClient.listImagesCmd().withShowAll(true).exec();
 
         for (LanguageEnum value : LanguageEnum.values()) {
